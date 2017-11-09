@@ -51,7 +51,8 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
             for var in var_list]
 
         # power of mu for bias-corrected first and second moment estimate
-        mu_power = tf.get_variable("mu_power", shape=(), dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(self._mu))
+        mu_power = tf.get_variable("mu_power", shape=(), dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(1.0))
+        # mu_power = tf.Variable(1.0, trainable=False)
 
         # save old mean and variance of grads
         old_ms = ms
@@ -69,9 +70,9 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
             ms_hat = [tf.divide(m,tf.constant(1.0)- mu_power) for m in ms]
             vs_hat = [tf.divide(v,tf.constant(1.0) - mu_power) for v in vs]
             ms_squared = [tf.square(m) for m in ms_hat]
-            rs = [v-m2 for v, m2 in zip(vs_hat, ms_squared)] #new varience
+            rs = [tf.maximum(v-m2,tf.zeros_like(v)) for v, m2 in zip(vs_hat, ms_squared)] #new varience
             # probability of sign switch (with equal variance assumption)
-            snrs = [tf.divide(m, tf.sqrt(r)+ self._eps) for m, r in zip(grads, rs)]
+            snrs = [tf.divide(m, tf.sqrt(r) + self._eps) for m, r in zip(grads, rs)]
             old_snrs = [tf.divide(m, tf.sqrt(r)+self._eps) for m, r in zip(old_grads,rs)]
             prob_greater_zero = [(0.5)*(1.0+tf.erf(tf.sqrt(1/2.0)*snr)) for snr in snrs]
             old_prob_greater_zero  =  [(0.5)*(1.0+tf.erf(tf.sqrt(1/2.0)*old_snr)) for old_snr in old_snrs]
