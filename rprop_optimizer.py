@@ -175,8 +175,8 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
 class RPROPOptimizer(tf.train.GradientDescentOptimizer):
 
-    def __init__(self, learning_rate, name="RPROP", delta_0=0.1,
-                 delta_min=10 ^(-6), delta_max=50,
+    def __init__(self, learning_rate, name="RPROP", delta_0=0.0001,
+                 delta_min=10 ^(-9), delta_max=0.05,
                  eta_minus=0.5, eta_plus=1.2):
         super(RPROPOptimizer, self).__init__(learning_rate, name=name)
         self._lr = learning_rate
@@ -204,21 +204,19 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
         # and old_dir (values of gradient changes)
 
         old_deltas = [self._get_or_make_slot(var,
-                  tf.constant(0.1, tf.float32, var.get_shape()), "delta", "delta")
+                  tf.constant(self._delta_0, tf.float32, var.get_shape()), "delta", "delta")
                   for var in var_list]
-        old_grads_sign = [self._get_or_make_slot(var,
-                  tf.constant(0, tf.float32, var.get_shape()), "grads_sign", "grads_sign")
+        old_grads = [self._get_or_make_slot(var,
+                  tf.constant(0, tf.float32, var.get_shape()), "grads", "grads")
                   for var in var_list]
-
-        # old_dirs = [self._get_or_make_slot(var,
-                #   tf.constant(0, tf.float32, var.get_shape()), "dir", "dir")
-                #   for var in var_list]
 
         grads = tf.gradients(loss, var_list)
         grads_sign = [tf.sign(grad) for grad in grads]
+        old_grads_sign = [tf.sign(old_grad) for old_grad in old_grads]
         mult_sign_masks = [tf.multiply(grad_sign,old_grad_sign)
                            for grad_sign,old_grad_sign
                            in zip(grads_sign,old_grads_sign)]
+
         # check the product of signs
         conds_equal = [tf.equal(mult_sign_mask,
                                 tf.zeros_like(mult_sign_mask)) for mult_sign_mask in mult_sign_masks]
@@ -228,6 +226,8 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
         conds_greater = [tf.greater(mult_sign_mask,tf.zeros_like(mult_sign_mask))
                          for mult_sign_mask in mult_sign_masks]
 
+
+        # Here we add statistic to track, it is not in the original algorithm
         # count the number of sign changes, the same signs and zero products
         # for every variable tensor
         # used for tracking of opt performance
@@ -241,19 +241,17 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
         switch=tf.add_n(count_less)
         no_switch=tf.add_n(count_greater)
         zero_prod=tf.add_n(count_equal)
-
         sign_changes={"switch": switch,"no_switch":no_switch,
                       "zero_prod":zero_prod}
 
+
+        #delta_update
         zeros=[tf.zeros_like(old_delta) for old_delta in old_deltas]
-
-
-        # calculate the all possible updates
+        # calculate the all possible delta updates
         deltas_equal=old_deltas
         deltas_less=[tf.maximum(d*eta_minus,
                                 tf.cast(tf.ones_like(d),tf.float32)*delta_min) for d in old_deltas]
         deltas_greater=[tf.minimum(d*eta_plus,tf.ones_like(d)*delta_max) for d in old_deltas]
-
         # select updates using cond tensors
         deltas=zeros
         deltas=[tf.where(cond_equal, delta_equal, delta) for (cond_equal,
@@ -270,29 +268,21 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
         old_deltas_updates = [old_delta.assign(delta)
                               for (old_delta, delta) in zip(old_deltas,deltas)]
 
-        #
-        dirs_geq=[-delta*grad_sign
-                  for  (delta,grad_sign) in zip(deltas,grads_sign)]
-
-        # we don't need it in the tech report implementation
-        # dirs_less=[-old_dir
-        #            for  old_dir in old_dirs]
-
+        # w update directions
         # select no update in case of negative product
         # or dir_geq update in other cases
         dirs=zeros
+        dirs_geq=[-delta*grad_sign
+                  for  (delta,grad_sign) in zip(deltas,grads_sign)]
         dirs=[tf.where(tf.logical_or(cond_equal,cond_greater), dir_geq, d)
               for (cond_equal,cond_greater,dir_geq,d)
               in zip(conds_equal,conds_greater,dirs_geq, dirs)]
 
-        # we don't need it in the tech report implementation
-        # old_dirs_updates=[old_dir.assign(d) for old_dir,d in zip(old_dirs,dirs)]
-
         # change grad to zero in case of negative product and save new gradients
-        grads_sign=[tf.where(cond_less,zero,grad_sign)
-                    for (cond_less,zero,grad_sign) in zip(conds_less,zeros,grads_sign)]
+        grads=[tf.where(cond_less,zero,grad_sign)
+                    for (cond_less,zero,grad_sign) in zip(conds_less,zeros,grads)]
         old_grads_updates = [old_grad.assign(g)
-                             for (old_grad, g) in zip(old_grads_sign, grads_sign)]
+                             for (old_grad, g) in zip(old_grads, grads)]
 
         # here learning rate is scaling parameter (in original paper there is no learning_rate)
         # we need to check how quikly we change it during training
