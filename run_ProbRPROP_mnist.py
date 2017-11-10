@@ -69,7 +69,7 @@ def train_model(model, batch_gen, num_train_steps,eval_every):
         sess.run(tf.global_variables_initializer())
         total_loss = 0.0 # we use this to calculate late average loss in the last SKIP_STEP steps
 
-        dir_to_save="./summary_for_delta/"+model.name+"/"
+        dir_to_save="./summary_for_delta2/"+model.name+"/"
         unique_str=model.opt_name+", delta_0=" + str(model._delta_0) + ", batch_size=" + str(model.batch_size)
         writer = tf.summary.FileWriter(dir_to_save+unique_str, sess.graph)
 

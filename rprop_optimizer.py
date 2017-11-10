@@ -10,7 +10,7 @@ import tensorflow as tf
 class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
     def __init__(self, delta_0,learning_rate = 1, name="ProbRPROP", mu=0.95,
-                 delta_min=10 ^(-6), delta_max=50,
+                 delta_min=10 ^(-9), delta_max=0.05,
                  eta_minus=0.5, eta_plus=1.2,eps=1e-8):
         super(ProbRPROPOptimizer, self).__init__(learning_rate, name=name)
         self._mu = mu
@@ -43,7 +43,7 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         # and old_dir (values of gradient changes)
 
         old_deltas = [self._get_or_make_slot(var,
-                  tf.constant(0.1, tf.float32, var.get_shape()), "delta", "delta")
+                  tf.constant(self._delta_0, tf.float32, var.get_shape()), "delta", "delta")
                   for var in var_list]
         old_grads = [self._get_or_make_slot(var,
                   tf.constant(0, tf.float32, var.get_shape()), "grads", "grads")
@@ -161,8 +161,8 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
                   in zip(conds_equal,conds_greater,dirs_geq, dirs)]
 
             # change grad to zero in case of negative product and save new gradients
-            grads_sign=[tf.where(cond_less,zero,grad_sign)
-                        for (cond_less,zero,grad_sign) in zip(conds_less,zeros,grads_sign)]
+            grads=[tf.where(cond_less,zero,grad_sign)
+                        for (cond_less,zero,grad_sign) in zip(conds_less,zeros,grads)]
             with tf.control_dependencies(probs+dirs):
                 old_grads_updates = [old_grad.assign(g)
                                      for (old_grad, g) in zip(old_grads, grads)]
