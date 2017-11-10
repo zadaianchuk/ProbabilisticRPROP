@@ -122,14 +122,14 @@ class model_RPROP(model_SGD):
 
 class model_ProbRPROP(model_SGD):
     """ Build the graph for RPROP """
-    def __init__(self, image_size, num_classes, batch_size, learning_rate):
-        model_SGD.__init__(self,image_size, num_classes, batch_size, learning_rate)
+    def __init__(self, image_size, num_classes, batch_size, delta_0, learning_rate = 1):
+        model_SGD.__init__(self, image_size, num_classes, batch_size, learning_rate)
         self.opt_name="ProbRPROP"
-
+        self._delta_0 = delta_0
     def _create_optimizer(self):
         """ Step 5: define optimizer """
         with tf.name_scope('optimizer'):
-            self.optimizer , self.tensors_for_summaries = opts.ProbRPROPOptimizer(self.lr).minimize(self.loss)
+            self.optimizer , self.tensors_for_summaries = opts.ProbRPROPOptimizer(delta_0=self._delta_0).minimize(self.loss)
     def _create_summaries(self):
         model_SGD._create_summaries(self)
         with tf.name_scope("summaries"):
@@ -202,8 +202,8 @@ class CNN_RPROP(model_RPROP):
 
 class LR_ProbRPROP(model_ProbRPROP):
     """ Build the graph for ProbRPOP LR"""
-    def __init__(self, image_size, num_classes, batch_size, learning_rate):
-        model_ProbRPROP.__init__(self,image_size, num_classes, batch_size, learning_rate)
+    def __init__(self, image_size, num_classes, batch_size, delta_0, learning_rate =1):
+        model_ProbRPROP.__init__(self,image_size, num_classes, batch_size, delta_0, learning_rate)
         self.name="LR"
 
     def _create_inference_model(self):
@@ -212,8 +212,8 @@ class LR_ProbRPROP(model_ProbRPROP):
 
 class CNN_ProbRPROP(model_ProbRPROP):
     """ Build the graph for ProbRPROP CNN """
-    def __init__(self, image_size, num_classes, batch_size, learning_rate):
-        model_ProbRPROP.__init__(self,image_size, num_classes, batch_size, learning_rate)
+    def __init__(self, image_size, num_classes, batch_size, delta_0, learning_rate = 1):
+        model_ProbRPROP.__init__(self,image_size, num_classes, batch_size,  delta_0, learning_rate)
         self.name="CNN"
 
     def _create_inference_model(self):

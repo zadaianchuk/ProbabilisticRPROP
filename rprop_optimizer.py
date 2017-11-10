@@ -1,16 +1,22 @@
 import tensorflow as tf
 
+# def _cond_less_equal_greater(cond, val_less, val_equal, val_greater):
+#     zeros = tf.zeros_like(cond)
+#     val = tf.where(tf.less(cond, zeros), val_less, val_equal)
+#     val = tf.where(tf.greater(cond, zeros), val_greater, val)
+#     return val
 
 
 class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
-    def __init__(self, learning_rate, name="ProbRPROP", mu=0.95, delta_0=0.1,
+    def __init__(self, delta_0,learning_rate = 1, name="ProbRPROP", mu=0.95,
                  delta_min=10 ^(-6), delta_max=50,
                  eta_minus=0.5, eta_plus=1.2,eps=1e-8):
         super(ProbRPROPOptimizer, self).__init__(learning_rate, name=name)
         self._mu = mu
         self._lr = learning_rate
         self._delta_0 = delta_0
+        print (self._delta_0)
         self._delta_min = delta_min
         self._delta_max = delta_max
         self._eta_minus = eta_minus

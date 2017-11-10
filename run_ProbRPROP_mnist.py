@@ -25,7 +25,7 @@ parser.add_argument("-eval","--eval_every", type=int,
                     help="Calculates summaries every $eval_every steps")
 parser.add_argument("-bs","--batch_size", type=int,
                     help="train the model with given batch size")
-parser.add_argument("-lr","--learning_rate", type=float,
+parser.add_argument("-del_0","--delta", type=float,
                     help="learning_rate")
 parser.add_argument("-r","--random_seed", type=int,
                     help="Fix Reandom_seed to reproduce the experiment")
@@ -44,10 +44,10 @@ if args.eval_every:
     EVAL_STEP = args.eval_every
 
 #Oprimization
-LEARNING_RATE=0.005
-if args.learning_rate:
-    LEARNING_RATE = args.learning_rate
-BATCH_SIZE=2000
+DELTA=0.001
+if args.delta:
+    DELTA = args.delta
+BATCH_SIZE=100
 if args.batch_size:
     BATCH_SIZE=args.batch_size
 RANDOM_SEED=random.randint(1,1000)
@@ -69,8 +69,8 @@ def train_model(model, batch_gen, num_train_steps,eval_every):
         sess.run(tf.global_variables_initializer())
         total_loss = 0.0 # we use this to calculate late average loss in the last SKIP_STEP steps
 
-        dir_to_save="../summary_test/"+model.name+"/"
-        unique_str=model.opt_name+", lr=" + str(model.lr) + ", batch_size=" + str(model.batch_size)
+        dir_to_save="./summary_for_delta/"+model.name+"/"
+        unique_str=model.opt_name+", delta_0=" + str(model._delta_0) + ", batch_size=" + str(model.batch_size)
         writer = tf.summary.FileWriter(dir_to_save+unique_str, sess.graph)
 
         # initial_step = model.global_step.eval()
@@ -112,7 +112,7 @@ def train_model(model, batch_gen, num_train_steps,eval_every):
 def main():
 
     models ={"LR":LR_ProbRPROP, "CNN":CNN_ProbRPROP}
-    model = models[MODEL_NAME](IMAGE_SIZE, NUM_CLASSES, BATCH_SIZE, LEARNING_RATE)
+    model = models[MODEL_NAME](IMAGE_SIZE, NUM_CLASSES, BATCH_SIZE, delta_0=DELTA)
     model.build_graph()
     train_model(model, batch_gen, NUM_TRAIN_STEPS, EVAL_STEP)
 
