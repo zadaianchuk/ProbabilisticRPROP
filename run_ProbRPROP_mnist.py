@@ -47,7 +47,7 @@ if args.eval_every:
 LEARNING_RATE=0.005
 if args.learning_rate:
     LEARNING_RATE = args.learning_rate
-BATCH_SIZE=1000
+BATCH_SIZE=2000
 if args.batch_size:
     BATCH_SIZE=args.batch_size
 RANDOM_SEED=random.randint(1,1000)
@@ -64,8 +64,6 @@ batch_gen=mnist.train
 NUM_CLASSES = 10
 IMAGE_SIZE = 784
 
-
-
 def train_model(model, batch_gen, num_train_steps,eval_every):
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -76,13 +74,16 @@ def train_model(model, batch_gen, num_train_steps,eval_every):
         writer = tf.summary.FileWriter(dir_to_save+unique_str, sess.graph)
 
         # initial_step = model.global_step.eval()
+        delta_hists_100 = []
         for index in range(NUM_TRAIN_STEPS):
             batch = batch_gen.next_batch(model.batch_size)
             feed_dict_batch={model.x: batch[0], model.y_: batch[1]}
-            loss_batch, _, fast_summary, hist_summary  = sess.run([model.loss, model.optimizer,
+            loss_batch, _, fast_summary, hist_summary= sess.run([model.loss, model.optimizer,
             model.fast_summary,model.hist_summary],
                                               feed_dict=feed_dict_batch)
-
+            if index<100:
+                delta_hists  = sess.run(model.delta_hists,feed_dict=feed_dict_batch)
+                delta_hists_100.append(delta_hists)
             writer.add_summary(fast_summary, global_step=index)
             writer.add_summary(hist_summary, global_step=index)
             if (index + 1) % eval_every == 0:
@@ -105,8 +106,8 @@ def train_model(model, batch_gen, num_train_steps,eval_every):
                     stream,slow_summary_test= sess.run([model.stream_fetches,model.slow_test_summary], {model.x: batch[0], model.y_: batch[1]})
                     total_loss=stream["loss"]
                 writer.add_summary(slow_summary_test, global_step=index)
-
-
+        with open(dir_to_save+unique_str+'_delta_hists.pickle', 'wb') as f:
+            pickle.dump(delta_hists_100, f)
 
 def main():
 
