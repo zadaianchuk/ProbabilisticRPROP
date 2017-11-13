@@ -31,6 +31,7 @@ parser.add_argument("-lr","--learning_rate", type=float,
 parser.add_argument("-r","--random_seed", type=int,
                     help="Fix Reandom_seed to reproduce the experiment")
 parser.add_argument("--num_val_examples", type=int, default=20000)
+parser.add_argument("--save_dir", type=str, default="./summary_test/")
 args = parser.parse_args()
 
 MODEL_NAME="LR"
@@ -68,7 +69,7 @@ def train_model(model, batch_gen, num_train_steps,eval_every):
         sess.run(tf.global_variables_initializer())
         total_loss = 0.0 # we use this to calculate late average loss in the last SKIP_STEP steps
 
-        dir_to_save="../summary_test/"+model.name+"/"
+        dir_to_save=args.save_dir+model.name+"/"
         unique_str=model.opt_name+", lr=" + str(model.lr) + ", batch_size=" + str(model.batch_size)
         writer = tf.summary.FileWriter(dir_to_save+unique_str, sess.graph)
 
