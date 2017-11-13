@@ -104,20 +104,35 @@ class model_SGD:
 
 class model_RPROP(model_SGD):
     """ Build the graph for RPROP without specific model """
-    def __init__(self, image_size, num_classes, batch_size, learning_rate):
+    def __init__(self, image_size, num_classes, batch_size, delta_0, learning_rate):
         model_SGD.__init__(self,image_size, num_classes, batch_size, learning_rate)
         self.opt_name="RPROP"
+        self._delta_0 = delta_0
 
     def _create_optimizer(self):
         """ Step 5: define optimizer """
         with tf.name_scope('optimizer'):
-            self.optimizer , self.sign_changes = opts.RPROPOptimizer(self.lr).minimize(self.loss)
+            self.optimizer , self.tensors_for_summaries = opts.RPROPOptimizer(self.lr).minimize(self.loss)
 
     def _create_summaries(self):
         model_SGD._create_summaries(self)
         with tf.name_scope("summaries"):
             with tf.name_scope("fast"):
-                switch_sum = tf.summary.scalar("switch", self.sign_changes["switch"], collections=['fast'])
+                hist_list_delta = []
+                delta_hists = []
+                for (i,delta) in enumerate(self.tensors_for_summaries['delta']):
+                    delta_sum = tf.summary.histogram("delta_hist/"+str(i), delta)
+
+                    value_range = [tf.reduce_min(delta),0.99*tf.reduce_max(delta)]
+                    nbins=tf.constant(100)
+                    delta_hist_counts = tf.histogram_fixed_width(values=delta, value_range=value_range, nbins=nbins, dtype=tf.float32)
+                    delta_hist = {"counts":delta_hist_counts, "range": value_range, "nbins":nbins }
+
+                    delta_hists.append(delta_hist)
+                    hist_list_delta.append(delta_sum)
+
+                self.delta_hists = delta_hists
+                switch_sum = tf.summary.scalar("switch", self.tensors_for_summaries['sign']["switch"], collections=['fast'])
                 self.fast_summary = tf.summary.merge([self.fast_summary, switch_sum])
 
 class model_ProbRPROP(model_SGD):
@@ -183,8 +198,8 @@ class CNN_SGD(model_SGD):
 
 class LR_RPROP(model_RPROP):
     """ Build the graph for SGD CNN """
-    def __init__(self, image_size, num_classes, batch_size, learning_rate):
-        model_RPROP.__init__(self,image_size, num_classes, batch_size, learning_rate)
+    def __init__(self, image_size, num_classes, batch_size, delta_0, learning_rate =1 ):
+        model_RPROP.__init__(self,image_size, num_classes, batch_size, delta_0, learning_rate)
         self.name="LR"
     def _create_inference_model(self):
         with tf.name_scope("inference"):
@@ -192,8 +207,8 @@ class LR_RPROP(model_RPROP):
 
 class CNN_RPROP(model_RPROP):
     """ Build the graph for SGD CNN """
-    def __init__(self, image_size, num_classes, batch_size, learning_rate):
-        model_RPROP.__init__(self,image_size, num_classes, batch_size, learning_rate)
+    def __init__(self, image_size, num_classes, batch_size, delta_0, learning_rate =1 ):
+        model_RPROP.__init__(self,image_size, num_classes, batch_size, delta_0, learning_rate)
         self.name="CNN"
     def _create_inference_model(self):
         with tf.name_scope("inference"):

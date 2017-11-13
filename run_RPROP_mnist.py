@@ -12,7 +12,7 @@ from importlib import reload
 import argparse
 import pickle
 
-from full_graph import LR_ProbRPROP, CNN_ProbRPROP
+from full_graph import LR_RPROP, CNN_RPROP
 import util
 reload(util)
 
@@ -69,7 +69,7 @@ def train_model(model, batch_gen, num_train_steps,eval_every):
         sess.run(tf.global_variables_initializer())
         total_loss = 0.0 # we use this to calculate late average loss in the last SKIP_STEP steps
 
-        dir_to_save="./summary_test/"+model.name+"/"
+        dir_to_save="./summary/"+model.name+"/"
         unique_str=model.opt_name+", delta_0=" + str(model._delta_0) + ", batch_size=" + str(model.batch_size)
         writer = tf.summary.FileWriter(dir_to_save+unique_str, sess.graph)
 
@@ -111,7 +111,7 @@ def train_model(model, batch_gen, num_train_steps,eval_every):
 
 def main():
 
-    models ={"LR":LR_ProbRPROP, "CNN":CNN_ProbRPROP}
+    models ={"LR":LR_RPROP, "CNN":CNN_RPROP}
     model = models[MODEL_NAME](IMAGE_SIZE, NUM_CLASSES, BATCH_SIZE, delta_0=DELTA)
     model.build_graph()
     train_model(model, batch_gen, NUM_TRAIN_STEPS, EVAL_STEP)

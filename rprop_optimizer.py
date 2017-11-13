@@ -176,7 +176,7 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
 
     def __init__(self, learning_rate, name="RPROP", delta_0=0.0001,
                  delta_min=10 ^(-9), delta_max=0.05,
-                 eta_minus=0.5, eta_plus=1.2):
+                 eta_minus=0.5, eta_plus=1.2, MAKE_NEG_STEP = False):
         super(RPROPOptimizer, self).__init__(learning_rate, name=name)
         self._lr = learning_rate
         self._delta_0 = delta_0
@@ -184,6 +184,7 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
         self._delta_max = delta_max
         self._eta_minus = eta_minus
         self._eta_plus = eta_plus
+        self.MAKE_NEG_STEP = MAKE_NEG_STEP
 
     def minimize(self, loss, var_list=None):
 
@@ -193,7 +194,7 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
         delta_max=tf.convert_to_tensor(self._delta_max, dtype=tf.float32)
         eta_minus=tf.convert_to_tensor(self._eta_minus, dtype=tf.float32)
         eta_plus=tf.convert_to_tensor(self._eta_plus, dtype=tf.float32)
-
+        MAKE_NEG_STEP = self.MAKE_NEG_STEP
         if var_list is None:
             var_list = tf.trainable_variables()
             print(var_list)
@@ -287,4 +288,5 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
             # we need to check how quikly we change it during training
             with tf.control_dependencies(old_grads_updates):
                 variable_updates = [v.assign_add(self._lr*d) for v, d in zip(var_list, dirs)]
-        return tf.group(*variable_updates),sign_changes
+        for_summaries = {"sign": sign_changes, "delta": deltas}
+        return tf.group(*variable_updates),for_summaries
