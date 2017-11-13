@@ -121,6 +121,9 @@ class model_RPROP(model_SGD):
                 hist_list_delta = []
                 delta_hists = []
                 for (i,delta) in enumerate(self.tensors_for_summaries['delta']):
+                    #find and clip big values
+                    cond =tf.greater(delta,tf.contrib.distributions.percentile(delta,85.0)*tf.ones_like(delta))
+                    delta = tf.where(cond, tf.contrib.distributions.percentile(delta,85.0)*tf.ones_like(delta), delta)
                     delta_sum = tf.summary.histogram("delta_hist/"+str(i), delta)
 
                     value_range = [tf.reduce_min(delta),0.99*tf.reduce_max(delta)]
@@ -164,6 +167,9 @@ class model_ProbRPROP(model_SGD):
                     hist_list_snr.append(snr_sum)
 
                 for (i,delta) in enumerate(self.tensors_for_summaries['delta']):
+                    #find and clip big values
+                    cond =tf.greater(delta,tf.contrib.distributions.percentile(delta,85.0)*tf.ones_like(delta))
+                    delta = tf.where(cond, tf.contrib.distributions.percentile(delta,85.0)*tf.ones_like(delta), delta)
                     delta_sum = tf.summary.histogram("delta_hist/"+str(i), delta)
 
                     value_range = [tf.reduce_min(delta),0.99*tf.reduce_max(delta)]
