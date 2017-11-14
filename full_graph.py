@@ -39,9 +39,8 @@ class model_SGD:
     def _create_loss(self):
         """ Define the loss function """
         with tf.name_scope("loss"):
-            self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.y_,
-                                                                               logits=self.y),
-                                       name = "loss" )
+            self.losses = tf.nn.softmax_cross_entropy_with_logits(labels=self.y_, logits=self.y)
+            self.loss = tf.reduce_mean(self.losses, name = "loss" )
 
     def _create_optimizer(self):
         """ Define optimizer """
@@ -122,8 +121,8 @@ class model_RPROP(model_SGD):
                 delta_hists = []
                 for (i,delta) in enumerate(self.tensors_for_summaries['delta']):
                     #find and clip big values
-                    cond =tf.greater(delta,tf.contrib.distributions.percentile(delta,85.0)*tf.ones_like(delta))
-                    delta = tf.where(cond, tf.contrib.distributions.percentile(delta,85.0)*tf.ones_like(delta), delta)
+                    cond =tf.greater(delta,tf.contrib.distributions.percentile(delta,75.0)*tf.ones_like(delta))
+                    delta = tf.where(cond, tf.contrib.distributions.percentile(delta,75.0)*tf.ones_like(delta), delta)
                     delta_sum = tf.summary.histogram("delta_hist/"+str(i), delta)
 
                     value_range = [tf.reduce_min(delta),0.99*tf.reduce_max(delta)]
@@ -147,12 +146,12 @@ class model_ProbRPROP(model_SGD):
     def _create_optimizer(self):
         """ Step 5: define optimizer """
         with tf.name_scope('optimizer'):
-            self.optimizer , self.tensors_for_summaries = opts.ProbRPROPOptimizer(delta_0=self._delta_0).minimize(self.loss)
+            self.optimizer , self.tensors_for_summaries = opts.ProbRPROPOptimizer(delta_0=self._delta_0).minimize(self.losses)
     def _create_summaries(self):
         model_SGD._create_summaries(self)
         with tf.name_scope("summaries"):
             with tf.name_scope("fast"):
-                mu_power_sum = tf.summary.scalar("mu_power",self.tensors_for_summaries['mu_power'])
+                # mu_power_sum = tf.summary.scalar("mu_power",self.tensors_for_summaries['mu_power'])
                 switch_sum = tf.summary.scalar("switch", self.tensors_for_summaries['sign']["switch"], collections=['fast'])
                 switch_prob_sum = tf.summary.scalar("switch_prob>0.75", self.tensors_for_summaries['sign']["switch_prob"], collections=['fast'])
                 hist_list_prob = []
@@ -181,7 +180,7 @@ class model_ProbRPROP(model_SGD):
                     hist_list_delta.append(delta_sum)
 
                 self.delta_hists = delta_hists
-                self.fast_summary = tf.summary.merge([mu_power_sum,self.fast_summary, switch_sum,switch_prob_sum, hist_list_prob, hist_list_snr,hist_list_delta])
+                self.fast_summary = tf.summary.merge([self.fast_summary, switch_sum,switch_prob_sum, hist_list_prob, hist_list_snr,hist_list_delta])
 
 class LR_SGD(model_SGD):
     """ Build the graph for SGD LR """
