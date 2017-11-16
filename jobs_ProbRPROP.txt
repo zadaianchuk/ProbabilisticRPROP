@@ -1,0 +1,1 @@
+/is/ei/azadaianchuk/RPROP/code/run_ProbRPROP.py cifar10.cifar10_3c3d --bs 128 --delta_0 0.0001 --delta_min 1e-09 --delta_max 0.05 --eta_minus 0.5 --eta_plus 1.2 -MNS True -UME True  -N 5000 -C 100 --logdir tflogs_min_max

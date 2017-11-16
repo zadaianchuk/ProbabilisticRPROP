@@ -3,3 +3,5 @@ __pycache__/*
 MNIST_data/*
 *summary*
 .ipynb_checkpoints/*
+*data*
+*logs*

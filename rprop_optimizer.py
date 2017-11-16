@@ -1,13 +1,13 @@
+from __future__ import division
+
 import tensorflow as tf
 import gradient_moment as gm
 
-
-
 class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
-    def __init__(self, delta_0,learning_rate = 1, name="ProbRPROP", mu=0.95,
-                 delta_min=10 ^(-9), delta_max=0.05,
-                 eta_minus=0.5, eta_plus=1.2,eps=1e-8, MAKE_NEG_STEP = False):
+    def __init__(self, delta_0, learning_rate = 1, name="ProbRPROP", mu=0.95,
+                 delta_min=10**(-9), delta_max=0.05,
+                 eta_minus=0.5, eta_plus=1.2,eps=1e-8):
         super(ProbRPROPOptimizer, self).__init__(learning_rate, name=name)
 
         self._mu = mu
@@ -18,9 +18,8 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         self._eta_minus = eta_minus
         self._eta_plus = eta_plus
         self._eps=eps
-        self.MAKE_NEG_STEP = MAKE_NEG_STEP
 
-    def minimize(self, losses, var_list=None, USE_MINIBATCH_ESTIMATE = True):
+    def minimize(self, losses, global_step, var_list=None, USE_MINIBATCH_ESTIMATE = True, MAKE_NEG_STEP = True):
 
         # Algo params as constant tensors
         mu = tf.convert_to_tensor(self._mu, dtype=tf.float32)
@@ -29,7 +28,6 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         delta_max=tf.convert_to_tensor(self._delta_max, dtype=tf.float32)
         eta_minus=tf.convert_to_tensor(self._eta_minus, dtype=tf.float32)
         eta_plus=tf.convert_to_tensor(self._eta_plus, dtype=tf.float32)
-        MAKE_NEG_STEP = self.MAKE_NEG_STEP
         if var_list is None:
             var_list = tf.trainable_variables()
             print(var_list)
@@ -138,6 +136,14 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
                     for (cond_greater, delta_greater, delta) in zip(conds_greater,
                                                                     deltas_greater, deltas)]
 
+            delta_mins = [tf.equal(delta,tf.cast(tf.ones_like(delta),tf.float32)*delta_min) for delta in deltas]
+            count_min=[tf.reduce_sum(tf.cast(delta_min,tf.int64))
+                        for delta_min in delta_mins]
+            delta_maxs = [tf.equal(delta,tf.cast(tf.ones_like(delta),tf.float32)*delta_max) for delta in deltas]
+            count_max=[tf.reduce_sum(tf.cast(delta_max,tf.int64))
+                        for delta_max in delta_maxs]
+            delta_min_count=tf.add_n(count_min)/n_of_parameters
+            delta_max_count=tf.add_n(count_max)/n_of_parameters
             # save new the deltas
             old_deltas_updates = [old_delta.assign(delta)
                                   for (old_delta, delta) in zip(old_deltas,deltas)]
@@ -171,12 +177,28 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
                     with tf.control_dependencies(old_grads_updates):
                         variable_updates = [v.assign_add(self._lr*d) for v, d in zip(var_list, dirs)]
                         for_summaries ={"sign": sign_changes,"prob":probs,"snr":abs_snrs,"delta": deltas}
-            return tf.group(*variable_updates),for_summaries
+                        global_step.assign_add(1)
+                        with tf.name_scope("summaries"):
+                            with tf.name_scope("per_iteration"):
+                                min_sum = tf.summary.scalar("min", delta_min_count, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+                                max_sum = tf.summary.scalar("max", delta_max_count, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+                                switch_sum = tf.summary.scalar("switch", sign_changes["switch"], collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+                                switch_prob_sum = tf.summary.scalar("switch_prob>0.75",sign_changes["switch_prob"], collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+                                for (i,prob) in enumerate(probs):
+                                    prob_sum = tf.summary.histogram("switch_hist/"+str(i), prob, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+                                for (i,snr) in enumerate(abs_snrs):
+                                    snr_sum = tf.summary.histogram("snr_hist/"+str(i), snr, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+                                for (i,delta) in enumerate(deltas):
+                                    #find and clip big values
+                                    cond =tf.greater(delta,tf.contrib.distributions.percentile(delta,85.0)*tf.ones_like(delta))
+                                    delta2 = tf.where(cond, tf.contrib.distributions.percentile(delta,85.0)*tf.ones_like(delta), delta)
+                                    delta_sum = tf.summary.histogram("delta_hist/"+str(i), delta2, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+            return tf.group(*variable_updates)
 
 class RPROPOptimizer(tf.train.GradientDescentOptimizer):
 
     def __init__(self, learning_rate, name="RPROP", delta_0=0.0001,
-                 delta_min=10 ^(-9), delta_max=0.05,
+                 delta_min=10**(-9), delta_max=0.05,
                  eta_minus=0.5, eta_plus=1.2, MAKE_NEG_STEP = False):
         super(RPROPOptimizer, self).__init__(learning_rate, name=name)
         self._lr = learning_rate
@@ -187,7 +209,7 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
         self._eta_plus = eta_plus
         self.MAKE_NEG_STEP = MAKE_NEG_STEP
 
-    def minimize(self, loss, var_list=None):
+    def minimize(self, loss, global_step, var_list=None):
 
         # Algo params as constant tensors
         delta_0=tf.convert_to_tensor(self._delta_0, dtype=tf.float32)
@@ -290,4 +312,5 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
             with tf.control_dependencies(old_grads_updates):
                 variable_updates = [v.assign_add(self._lr*d) for v, d in zip(var_list, dirs)]
                 for_summaries = {"sign": sign_changes, "delta": deltas}
-        return tf.group(*variable_updates),for_summaries
+                global_step.assign_add(1)
+        return tf.group(*variable_updates)
