@@ -42,7 +42,7 @@ import tfobs
 parser = argparse.ArgumentParser(description="Run MomentumOptimizer on a tfobs "
     "test problem.")
 parser.add_argument("test_problem",
-    help="Name of the test_problem (e.g. 'cifar.cifar10_3c3d'")
+    help="Name of the test_problem (e.g. 'cifar10.cifar10_3c3d'")
 parser.add_argument("--data_dir",
     help="Path to the base data dir. If not set, tfobs uses its default.")
 parser.add_argument("--bs", "--batch_size", required=True, type=int,
@@ -189,7 +189,7 @@ for n in range(args.num_steps+1):
       train_acc_ += a_
     train_loss_ /= float(num_eval_iters)
     train_acc_ /= float(num_eval_iters)
-    
+
     # Evaluate on test set
     test_loss_, test_acc_ = 0.0, 0.0
     for _ in range(num_eval_iters):
@@ -198,13 +198,13 @@ for n in range(args.num_steps+1):
       test_acc_ += a_
     test_loss_ /= float(num_eval_iters)
     test_acc_ /= float(num_eval_iters)
-    
+
     # Append results to lists
     checkpoint_train_losses.append(train_loss_)
     checkpoint_train_accuracies.append(train_acc_)
     checkpoint_test_losses.append(test_loss_)
     checkpoint_test_accuracies.append(test_acc_)
-    
+
     # Log results to tensorflow summaries
     if not args.nologs:
       summary = tf.Summary()
@@ -213,7 +213,7 @@ for n in range(args.num_steps+1):
       summary.value.add(tag="checkpoint_test_loss", simple_value=test_loss_)
       summary.value.add(tag="checkpoint_test_acc", simple_value=test_acc_)
       summary_writer.add_summary(summary, n)
-    
+
     print "TRAIN: loss", train_loss_, "acc", train_acc_
     print "TEST: loss", test_loss_, "acc", test_acc_
     print "********************************"
@@ -221,7 +221,7 @@ for n in range(args.num_steps+1):
     # Break from train loop after the last round of evaluation
     if n==args.num_steps:
       break
-  
+
   # Training step, with logging if we hit the train_log_interval
   if n%args.train_log_interval!=0:
     _ = sess.run(step, {phase: "train"})
@@ -236,7 +236,7 @@ for n in range(args.num_steps+1):
     train_losses.append(loss_)
     if args.print_train_iter:
       print "Step", n, ": loss", loss_
-    
+
 sess.close()
 # ------- end of train looop --------
 

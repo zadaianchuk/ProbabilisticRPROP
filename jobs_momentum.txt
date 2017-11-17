@@ -1,0 +1,1 @@
+/is/ei/azadaianchuk/RPROP/code/run_momentum.py cifar10.cifar10_3c3d --bs 128 --mu 0.99 --lr 0.0001 -N 20000 -C 100 --logdir tflogs_eta_minus

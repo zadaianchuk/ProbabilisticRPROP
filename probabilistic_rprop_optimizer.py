@@ -3,7 +3,7 @@ from __future__ import division
 import tensorflow as tf
 import gradient_moment as gm
 
-class RPROPOptimizer(tf.train.GradientDescentOptimizer):
+class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
     def __init__(self, delta_0, learning_rate = 1, name="ProbRPROP", mu=0.95,
                  delta_min=10**(-9), delta_max=0.05,
@@ -113,6 +113,12 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
                            for cond_greater in conds_greater]
             count_equal=[tf.reduce_sum(tf.cast(cond_equal,tf.int64))
                          for cond_equal in conds_equal ]
+
+            probs_between = [tf.logical_and(tf.greater(prob,0.25*tf.ones_like(prob)),tf.less(prob,0.75*tf.ones_like(prob))) for prob in probs]
+            probs_near_zero = [tf.less(prob,0.25*tf.ones_like(prob)) for prob in probs]
+            probs_near_one = [tf.greater(prob,0.75*tf.ones_like(prob)) for prob in probs]
+
+
             # summary switch
             switch=tf.add_n(count_less)
             no_switch=tf.add_n(count_greater)
@@ -131,9 +137,9 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
             deltas=old_deltas
             deltas=[tf.where(cond_less, delta_less, delta) for (cond_less, delta_less,
                                                                 delta)
-                        in zip(conds_less,deltas_less, deltas)]
+                        in zip(probs_near_one,deltas_less, deltas)]
             deltas=[tf.where(cond_greater, delta_greater, delta)
-                    for (cond_greater, delta_greater, delta) in zip(conds_greater,
+                    for (cond_greater, delta_greater, delta) in zip(probs_near_zero,
                                                                     deltas_greater, deltas)]
 
             delta_mins = [tf.equal(delta,tf.cast(tf.ones_like(delta),tf.float32)*delta_min) for delta in deltas]
@@ -161,11 +167,11 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
                               for  (delta,grad_sign) in zip(deltas,grads_sign)]
                     dirs=[tf.where(tf.logical_or(cond_equal,cond_greater), dir_geq, d)
                           for (cond_equal,cond_greater,dir_geq,d)
-                          in zip(conds_equal,conds_greater,dirs_geq, dirs)]
+                          in zip(probs_between,prob_near_zero,dirs_geq, dirs)]
 
                 # change grad to zero in case of negative product and save new gradients
                 grads=[tf.where(cond_less,zero,grad)
-                            for (cond_less,zero,grad) in zip(conds_less,zeros,grads)]
+                            for (cond_less,zero,grad) in zip(probs_near_one,zeros,grads)]
                 old_grads_updates = [old_grad.assign(g)
                                      for (old_grad, g) in zip(old_grads, grads)]
 
