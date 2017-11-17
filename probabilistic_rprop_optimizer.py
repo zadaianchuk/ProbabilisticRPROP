@@ -7,7 +7,7 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
     def __init__(self, delta_0, learning_rate = 1, name="ProbRPROP", mu=0.95,
                  delta_min=10**(-9), delta_max=0.05,
-                 eta_minus=0.5, eta_plus=1.2,eps=1e-8):
+                 eta_minus=0.5, eta_plus=1.2, p_min=0.75, eps=1e-8):
         super(ProbRPROPOptimizer, self).__init__(learning_rate, name=name)
 
         self._mu = mu
@@ -114,9 +114,9 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
             count_equal=[tf.reduce_sum(tf.cast(cond_equal,tf.int64))
                          for cond_equal in conds_equal ]
 
-            probs_between = [tf.logical_and(tf.greater(prob,0.25*tf.ones_like(prob)),tf.less(prob,0.75*tf.ones_like(prob))) for prob in probs]
-            probs_near_zero = [tf.less(prob,0.25*tf.ones_like(prob)) for prob in probs]
-            probs_near_one = [tf.greater(prob,0.75*tf.ones_like(prob)) for prob in probs]
+            probs_between = [tf.logical_and(tf.greater(prob,p_min*tf.ones_like(prob)),tf.less(prob,(1-p_min)*tf.ones_like(prob))) for prob in probs]
+            probs_near_zero = [tf.less(prob,p_min*tf.ones_like(prob)) for prob in probs]
+            probs_near_one = [tf.greater(prob,p_min*tf.ones_like(prob)) for prob in probs]
 
 
             # summary switch

@@ -69,6 +69,11 @@ parser.add_argument("--lr", type=float, default=1,
     help="Constant learning rate (positive float) to use. To set a learning "
     "rate *schedule*, do *not* set '--lr' and use '--lr_sched_steps' "
     "and '--lr_sched_values' instead.")
+parser.add_argument("--p_min", type=float, default=0.25,
+    help="The probability for theshold: if the probability of sign change is less"
+    "than this we change to the case where sign of the product is positive one"
+    "If the probability of sign change is larger then 1-p_min we change the  to the case where sign of the product is negative one"
+    "if the probability of sign change is between p then 1-p_min we change the  to the case where sign of the product is zero")
 parser.add_argument("--lr_sched_steps", nargs="+", type=int,
     help="One or more step numbers (positive integers) that mark learning rate "
     "changes, e.g., '--lr_sched_steps 2000 4000 5000' to change the learning "
@@ -156,7 +161,7 @@ learning_rate = tfobs.run_utils.make_learning_rate_tensor(global_step, args)
 # Set up optimizer
 opt =  opts.ProbRPROPOptimizer(delta_0=args.delta_0,
              delta_min=args.delta_min, delta_max=args.delta_max,
-             eta_minus=args.eta_minus, eta_plus=args.eta_plus)
+             eta_minus=args.eta_minus, eta_plus=args.eta_plus, p_min = args.p_min)
 step = opt.minimize(losses, var_list=variables, global_step=global_step, USE_MINIBATCH_ESTIMATE=args.USE_MINIBATCH_ESTIMATE, MAKE_NEG_STEP=args.MAKE_NEG_STEP)
 
 # Lists for tracking stuff
