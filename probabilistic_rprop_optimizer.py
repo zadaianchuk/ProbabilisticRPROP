@@ -18,7 +18,7 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         self._eta_minus = eta_minus
         self._eta_plus = eta_plus
         self._eps=eps
-        self._p_min
+        self._p_min = p_min
 
     def minimize(self, losses, global_step, var_list=None, USE_MINIBATCH_ESTIMATE = True, MAKE_NEG_STEP = True):
 

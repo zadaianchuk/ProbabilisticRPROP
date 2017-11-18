@@ -8,7 +8,7 @@ class RPROPOptimizer(tf.train.GradientDescentOptimizer):
     def __init__(self, delta_0, learning_rate = 1, name="ProbRPROP", mu=0.95,
                  delta_min=10**(-9), delta_max=0.05,
                  eta_minus=0.5, eta_plus=1.2,eps=1e-8):
-        super(ProbRPROPOptimizer, self).__init__(learning_rate, name=name)
+        super(RPROPOptimizer, self).__init__(learning_rate, name=name)
 
         self._mu = mu
         self._lr = learning_rate
