@@ -172,8 +172,8 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
                           in zip(probs_between,prob_near_zero,dirs_geq, dirs)]
 
                 # change grad to zero in case of negative product and save new gradients
-                grads=[tf.where(cond_less,zero,grad)
-                            for (cond_less,zero,grad) in zip(probs_near_one,zeros,grads)]
+                # grads=[tf.where(cond_less,zero,grad)
+                #             for (cond_less,zero,grad) in zip(probs_near_one,zeros,grads)]
                 old_grads_updates = [old_grad.assign(g)
                                      for (old_grad, g) in zip(old_grads, grads)]
 
