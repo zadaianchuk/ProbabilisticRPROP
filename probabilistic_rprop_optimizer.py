@@ -118,7 +118,7 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
             probs_between = [tf.logical_and(tf.greater(prob,p_min*tf.ones_like(prob)),tf.less(prob,(1-p_min)*tf.ones_like(prob))) for prob in probs]
             probs_near_zero = [tf.less(prob,p_min*tf.ones_like(prob)) for prob in probs]
-            probs_near_one = [tf.greater(prob,p_min*tf.ones_like(prob)) for prob in probs]
+            probs_near_one = [tf.greater(prob,(1-p_min)*tf.ones_like(prob)) for prob in probs]
 
 
             # summary switch

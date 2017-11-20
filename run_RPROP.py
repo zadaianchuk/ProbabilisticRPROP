@@ -121,7 +121,7 @@ args = parser.parse_args()
 
 # Create an identifier for this experiment
 name = args.test_problem.split(".")[-1]
-name += "__ProbRPROP"
+name += "__RPROP"
 name += "__bs_" + str(args.bs)
 name += "__delta_0_" + tfobs.run_utils.float2str(args.delta_0)
 name += "__delta_min_" + tfobs.run_utils.float2str(args.delta_min)
