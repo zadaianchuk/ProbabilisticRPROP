@@ -36,7 +36,7 @@ import time
 import os
 
 import tfobs
-import probabilistic_rprop_optimizer as opts
+import probabilistic_rprop_optimizer3 as opts
 reload(opts)
 
 # ------- Parse Command Line Arguments ----------------------------------------
@@ -60,10 +60,23 @@ parser.add_argument("--eta_minus",  type=float, default=0.5,
     help="Decrease of step size")
 parser.add_argument("--eta_plus",  type=float, default=1.2,
     help="Increase of step size")
-parser.add_argument("-MNS","--MAKE_NEG_STEP",  type=bool, default=False,
+parser.add_argument("--eta_type",  type=str, default="linear",
+    help="Type of eta function")
+parser.add_argument("-MNS","--MAKE_NEG_STEP", dest='MAKE_NEG_STEP', action='store_true',
     help="If True we do make smaller step in case of sign switch")
-parser.add_argument("-UME","--USE_MINIBATCH_ESTIMATE",  type=bool, default=True,
+parser.set_defaults(MAKE_NEG_STEP=True)
+parser.add_argument("-NNS","--NO_NEG_STEP", dest='MAKE_NEG_STEP', action='store_false')
+
+parser.add_argument("-UME","--USE_MINIBATCH_ESTIMATE", dest='USE_MINIBATCH_ESTIMATE', action='store_true',
     help="If True we use mini-batch estimate of varience")
+parser.set_defaults(USE_MINIBATCH_ESTIMATE=True)
+parser.add_argument("-UMA","--USE_MOVING", dest='USE_MINIBATCH_ESTIMATE', action='store_false')
+
+parser.add_argument("-SS","--SOFT_SIGN",  dest='SOFT_SIGN', action='store_true',
+    help="If True we do variance-adapted direction")
+parser.set_defaults(SOFT_SIGN=True)
+parser.add_argument("-NSS","--NO_SOFT_SIGN",  dest='SOFT_SIGN', action='store_false',
+    help="If True we do variance-adapted direction")
 
 parser.add_argument("--lr", type=float, default=1,
     help="Constant learning rate (positive float) to use. To set a learning "
@@ -134,9 +147,11 @@ name += "__delta_max_" + tfobs.run_utils.float2str(args.delta_max)
 name += "__p_min_" + str(args.p_min)
 name += "__eta_minus_" + str(args.eta_minus)
 name += "__eta_plus_" + str(args.eta_plus)
+name += "__eta_type_" + args.eta_type
 name += "__N_" + str(args.num_steps)
 name += "__MNS_" + str(args.MAKE_NEG_STEP)
 name += "__UME_" + str(args.USE_MINIBATCH_ESTIMATE)
+name += "__SOFT_" + str(args.SOFT_SIGN)
 name += "__seed_" + str(args.random_seed)
 # Set the data dir
 if args.data_dir is not None:
@@ -162,8 +177,8 @@ learning_rate = tfobs.run_utils.make_learning_rate_tensor(global_step, args)
 # Set up optimizer
 opt =  opts.ProbRPROPOptimizer(delta_0=args.delta_0,
              delta_min=args.delta_min, delta_max=args.delta_max,
-             eta_minus=args.eta_minus, eta_plus=args.eta_plus, p_min = args.p_min)
-step = opt.minimize(losses, var_list=variables, global_step=global_step, USE_MINIBATCH_ESTIMATE=args.USE_MINIBATCH_ESTIMATE, MAKE_NEG_STEP=args.MAKE_NEG_STEP)
+             eta_minus=args.eta_minus, eta_plus=args.eta_plus, p_min = args.p_min, eta_type = args.eta_type)
+step = opt.minimize(losses, var_list=variables, global_step=global_step, USE_MINIBATCH_ESTIMATE=args.USE_MINIBATCH_ESTIMATE, MAKE_NEG_STEP=args.MAKE_NEG_STEP, SOFT_SIGN=args.SOFT_SIGN)
 
 # Lists for tracking stuff
 # train_<quantity>[i] is <quantity> after training for train_steps[i] steps
@@ -218,7 +233,7 @@ for n in range(args.num_steps+1):
     test_loss_ /= float(num_eval_iters)
     test_acc_ /= float(num_eval_iters)
 
-    # Append results to lists
+    # Append results to listsMNS
     checkpoint_train_losses.append(train_loss_)
     checkpoint_train_accuracies.append(train_acc_)
     checkpoint_test_losses.append(test_loss_)

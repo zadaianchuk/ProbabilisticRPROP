@@ -60,10 +60,16 @@ parser.add_argument("--eta_minus",  type=float, default=0.5,
     help="Decrease of step size")
 parser.add_argument("--eta_plus",  type=float, default=1.2,
     help="Increase of step size")
-parser.add_argument("-MNS","--MAKE_NEG_STEP",  type=bool, default=False,
+
+parser.add_argument("-MNS","--MAKE_NEG_STEP", dest='MAKE_NEG_STEP', action='store_true',
     help="If True we do make smaller step in case of sign switch")
-parser.add_argument("-UME","--USE_MINIBATCH_ESTIMATE",  type=bool, default=True,
+parser.set_defaults(MAKE_NEG_STEP=True)
+parser.add_argument("-NNS","--NO_NEG_STEP", dest='MAKE_NEG_STEP', action='store_false')
+
+parser.add_argument("-UME","--USE_MINIBATCH_ESTIMATE", dest='USE_MINIBATCH_ESTIMATE', action='store_true',
     help="If True we use mini-batch estimate of varience")
+parser.set_defaults(USE_MINIBATCH_ESTIMATE=True)
+parser.add_argument("-UMA","--USE_MOVING", dest='USE_MINIBATCH_ESTIMATE', action='store_false')
 
 parser.add_argument("--lr", type=float, default=1,
     help="Constant learning rate (positive float) to use. To set a learning "

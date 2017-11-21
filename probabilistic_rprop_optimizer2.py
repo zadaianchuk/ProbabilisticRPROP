@@ -11,7 +11,6 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         super(ProbRPROPOptimizer, self).__init__(learning_rate, name=name)
 
         self._mu = mu
-        self._lr = learning_rate
         self._delta_0 = delta_0
         self._delta_min = delta_min
         self._delta_max = delta_max
@@ -20,7 +19,7 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         self._eps=eps
         self._p_min = p_min
 
-    def minimize(self, losses, global_step, var_list=None, USE_MINIBATCH_ESTIMATE = True, MAKE_NEG_STEP = True):
+    def minimize(self, losses, global_step, var_list=None, USE_MINIBATCH_ESTIMATE = True, MAKE_NEG_STEP = True, SOFT_SIGN = False):
 
         # Algo params as constant tensors
         mu = tf.convert_to_tensor(self._mu, dtype=tf.float32)
@@ -33,16 +32,15 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         if var_list is None:
             var_list = tf.trainable_variables()
             print(var_list)
-
-
+        CHANGE_GRAD_TO_ZERO = True
         # Create and retrieve slot variables for delta , old_grad values
         # and old_dir (values of gradient changes)
 
         old_deltas = [self._get_or_make_slot(var,
                   tf.constant(self._delta_0, tf.float32, var.get_shape()), "delta", "delta")
                   for var in var_list]
-        old_grads = [self._get_or_make_slot(var,
-                  tf.constant(0, tf.float32, var.get_shape()), "grads", "grads")
+        old_probs_greater_zero = [self._get_or_make_slot(var,
+                  tf.constant(0.5, tf.float32, var.get_shape()), "prob_g_z", "prob_g_z")
                   for var in var_list]
 
         if not USE_MINIBATCH_ESTIMATE:
@@ -81,11 +79,9 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
 
         snrs = [tf.divide(m, tf.sqrt(r) + self._eps) for m, r in zip(grads, rs)]
-        old_snrs = [tf.divide(m, tf.sqrt(r)+self._eps) for m, r in zip(old_grads,rs)]
-        prob_greater_zero = [(0.5)*(1.0+tf.erf(tf.sqrt(1/2.0)*snr)) for snr in snrs]
-        old_prob_greater_zero  =  [(0.5)*(1.0+tf.erf(tf.sqrt(1/2.0)*old_snr)) for old_snr in old_snrs]
+        probs_greater_zero = [(0.5)*(1.0+tf.erf(tf.sqrt(1/2.0)*snr)) for snr in snrs]
         probs = [tf.multiply(p,1-old_p)+tf.multiply(old_p,1-p)
-                 for p, old_p in zip(prob_greater_zero, old_prob_greater_zero)]
+                 for p, old_p in zip(probs_greater_zero, old_probs_greater_zero)]
         # summary scalar switch_prob_0.75
         counds_prob=[tf.greater(prob, 0.75*tf.ones_like(prob)) for prob in probs]
         count_prob=[tf.reduce_sum(tf.cast(cond,tf.int64))
@@ -96,30 +92,19 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
         # find sign of product of gradients
         grads_sign = [tf.sign(grad) for grad in grads]
-        old_grads_sign = [tf.sign(old_grad) for old_grad in old_grads]
-        prods = [tf.multiply(grad_sign,old_grad_sign)
-                           for grad_sign,old_grad_sign
-                           in zip(grads_sign,old_grads_sign)]
-        with tf.control_dependencies(prods+probs):
-            # check the product of signs
-            conds_equal = [tf.equal(prod,tf.zeros_like(prod)) for prod in prods]
-            conds_less = [tf.less(prod,tf.zeros_like(prod)) for prod in prods]
-            conds_greater = [tf.greater(prod,tf.zeros_like(prod)) for prod in prods]
-
+        with tf.control_dependencies(probs+grads_sign):
+            probs_between = [tf.logical_and(tf.greater(prob,p_min*tf.ones_like(prob)),tf.less(prob,(1-p_min)*tf.ones_like(prob))) for prob in probs]
+            probs_near_zero = [tf.less(prob,p_min*tf.ones_like(prob)) for prob in probs]
+            probs_near_one = [tf.greater(prob,(1-p_min)*tf.ones_like(prob)) for prob in probs]
             # count the number of sign changes, the same signs and zero products
             # for every variable tensor
             # used for tracking of opt performance
             count_less=[tf.reduce_sum(tf.cast(cond_less,tf.int64))
-                        for cond_less in conds_less]
+                        for cond_less in probs_near_one]
             count_greater=[tf.reduce_sum(tf.cast(cond_greater,tf.int64))
-                           for cond_greater in conds_greater]
+                           for cond_greater in probs_near_zero ]
             count_equal=[tf.reduce_sum(tf.cast(cond_equal,tf.int64))
-                         for cond_equal in conds_equal ]
-
-            probs_between = [tf.logical_and(tf.greater(prob,p_min*tf.ones_like(prob)),tf.less(prob,(1-p_min)*tf.ones_like(prob))) for prob in probs]
-            probs_near_zero = [tf.less(prob,p_min*tf.ones_like(prob)) for prob in probs]
-            probs_near_one = [tf.greater(prob,(1-p_min)*tf.ones_like(prob)) for prob in probs]
-
+                         for cond_equal in probs_between ]
 
             # summary switch
             switch=tf.add_n(count_less)
@@ -160,28 +145,32 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
             # select no update in case of negative product
             # or dir_geq update in other cases
             with tf.control_dependencies(old_deltas_updates):
+                if SOFT_SIGN:
+                    ds = [2*p-1 for p in probs_greater_zero]
+                else:
+                    ds = grads_sign
                 if MAKE_NEG_STEP:
-                    dirs = [-delta*grad_sign
-                              for  (delta,grad_sign) in zip(deltas,grads_sign)]
+                    dirs = [-delta*d
+                              for  (delta,d) in zip(deltas,ds)]
                 else:
                     dirs=zeros
-                    dirs_geq=[-delta*grad_sign
-                              for  (delta,grad_sign) in zip(deltas,grads_sign)]
+                    dirs_geq=[-delta*d
+                              for  (delta,d) in zip(deltas,ds)]
                     dirs=[tf.where(tf.logical_or(cond_equal,cond_greater), dir_geq, d)
                           for (cond_equal,cond_greater,dir_geq,d)
                           in zip(probs_between,prob_near_zero,dirs_geq, dirs)]
-
-                # change grad to zero in case of negative product and save new gradients
-                # grads=[tf.where(cond_less,zero,grad)
-                #             for (cond_less,zero,grad) in zip(probs_near_one,zeros,grads)]
+                if CHANGE_GRAD_TO_ZERO:
+                    # change grad to zero in case of negative product and save new gradients
+                    probs_greater_zero=[tf.where(prob,0.5*tf.ones_like(prob_greater_zero),prob_greater_zero)
+                                for (prob,prob_greater_zero) in zip(probs_near_one,probs_greater_zero)]
 
                 with tf.control_dependencies(dirs):
-                    old_grads_updates = [old_grad.assign(g)
-                                         for (old_grad, g) in zip(old_grads, grads)]
+                    old_probs_greater_zero_updates = [old_prob.assign(prob)
+                                         for (old_prob, prob) in zip(old_probs_greater_zero, probs_greater_zero)]
 
                     # here learning rate is scaling parameter, by default equal 1
-                    with tf.control_dependencies(old_grads_updates):
-                        variable_updates = [v.assign_add(self._lr*d) for v, d in zip(var_list, dirs)]
+                    with tf.control_dependencies(old_probs_greater_zero_updates):
+                        variable_updates = [v.assign_add(d) for v, d in zip(var_list, dirs)]
                         for_summaries ={"sign": sign_changes,"prob":probs,"snr":abs_snrs,"delta": deltas}
                         global_step.assign_add(1)
                         with tf.name_scope("summaries"):
@@ -192,6 +181,8 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
                                 switch_prob_sum = tf.summary.scalar("switch_prob>0.75",sign_changes["switch_prob"], collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
                                 for (i,prob) in enumerate(probs):
                                     prob_sum = tf.summary.histogram("switch_hist/"+str(i), prob, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+                                for (i,prob) in enumerate(probs_greater_zero):
+                                    prob_sum = tf.summary.histogram("prob_zero_hist/"+str(i), prob, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
                                 for (i,snr) in enumerate(abs_snrs):
                                     snr_sum = tf.summary.histogram("snr_hist/"+str(i), snr, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
                                 for (i,delta) in enumerate(deltas):

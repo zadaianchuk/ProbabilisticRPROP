@@ -1,8 +1,8 @@
 .idea/*
 __pycache__/*
-MNIST_data/*
 *summary*
 .ipynb_checkpoints/*
 *data*
 *logs*
-*,pyc
+*results*
+*.pyc
