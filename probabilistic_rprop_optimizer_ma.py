@@ -40,7 +40,7 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         return eta
 
 
-    def minimize(self, loss, global_step, var_list=None, USE_MINIBATCH_ESTIMATE = True,  SOFT_SIGN = False):
+    def minimize(self, loss, global_step, var_list=None, SOFT_SIGN = False):
 
         # Algo params as constant tensors
         mu = tf.convert_to_tensor(self._mu, dtype=tf.float32)
@@ -63,41 +63,38 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
                   tf.constant(0.5, tf.float32, var.get_shape()), "prob_g_z", "prob_g_z")
                   for var in var_list]
 
-        if not USE_MINIBATCH_ESTIMATE:
-            # moving average estimation
-            ms = [self._get_or_make_slot(var,
-                tf.constant(0.0, tf.float32, var.get_shape()), "m", "m")
-                for var in var_list]
-            vs = [self._get_or_make_slot(var,
-                tf.constant(0.0, tf.float32, var.get_shape()), "v", "v")
-                for var in var_list]
-            # power of mu for bias-corrected first and second moment estimate
-            mu_power = tf.get_variable("mu_power", shape=(), dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(1.0))
+        # moving average estimation
+        ms = [self._get_or_make_slot(var,
+                                     tf.constant(0.0, tf.float32, var.get_shape()), "m", "m")
+              for var in var_list]
+        vs = [self._get_or_make_slot(var,
+                                     tf.constant(0.0, tf.float32, var.get_shape()), "v", "v")
+              for var in var_list]
+        # power of mu for bias-corrected first and second moment estimate
+        mu_power = tf.get_variable("mu_power", shape=(), dtype=tf.float32, trainable=False, initializer=tf.constant_initializer(1.0))
 
 
-            grads = tf.gradients(loss, var_list)
-            grads_squared = [tf.square(g) for g in grads]
+        grads = tf.gradients(loss, var_list)
+        grads_squared = [tf.square(g) for g in grads]
 
-            m_updates = [m.assign(mu*m + (1.0-mu)*g) for m, g in zip(ms, grads)] #new means
-            v_updates = [v.assign(mu*v + (1.0-mu)*g2) for v, g2 in zip(vs, grads_squared)]
-            mu_power_update = [tf.assign(mu_power,tf.multiply(mu_power,mu))]
+        m_updates = [m.assign(mu*m + (1.0-mu)*g) for m, g in zip(ms, grads)] #new means
+        v_updates = [v.assign(mu*v + (1.0-mu)*g2) for v, g2 in zip(vs, grads_squared)]
+        mu_power_update = [tf.assign(mu_power,tf.multiply(mu_power,mu))]
 
-            #calculate probability of sign switch
-            with tf.control_dependencies(v_updates+m_updates+mu_power_update):
-                #bais_correction
-                ms_hat = [tf.divide(m,tf.constant(1.0)- mu_power) for m in ms]
-                vs_hat = [tf.divide(v,tf.constant(1.0) - mu_power) for v in vs]
-                ms_squared = [tf.square(m) for m in ms_hat]
+        #calculate probability of sign switch
+        with tf.control_dependencies(v_updates+m_updates+mu_power_update):
+            #bais_correction
+            ms_hat = [tf.divide(m,tf.constant(1.0)- mu_power) for m in ms]
+            vs_hat = [tf.divide(v,tf.constant(1.0) - mu_power) for v in vs]
+            ms_squared = [tf.square(m) for m in ms_hat]
 
-                rs = [tf.maximum(v-m2,tf.zeros_like(v)) for v, m2 in zip(vs_hat, ms_squared)] #new varience
-                # probability of sign switch (with equal variance assumption)
-        else:
-            grads, grad_moms, loss, batch_size = gm.grads_and_grad_moms(losses, var_list)
-            grads_squared =  [tf.square(grad) for grad in grads]
-            rs = [tf.maximum(tf.divide(m-g2, batch_size-1.0), 0.0) for g2, m in zip(grads_squared, grad_moms)]
+            rs = [tf.maximum(v-m2,tf.zeros_like(v)) for v, m2 in zip(vs_hat, ms_squared)] #new varience
+            # probability of sign switch (with equal variance assumption)
 
 
         snrs = [tf.divide(m, tf.sqrt(r) + self._eps) for m, r in zip(grads, rs)]
+        snrs_for_d = [tf.divide(m, tf.sqrt(r) + self._eps) for m, r in zip(ms_hat, rs)]
+        probs_greater_zero_for_d = [(0.5)*(1.0+tf.erf(tf.sqrt(1/2.0)*snr)) for snr in snrs_for_d]
         probs_greater_zero = [(0.5)*(1.0+tf.erf(tf.sqrt(1/2.0)*snr)) for snr in snrs]
         probs = [tf.multiply(p,1-old_p)+tf.multiply(old_p,1-p)
                  for p, old_p in zip(probs_greater_zero, old_probs_greater_zero)]
@@ -134,7 +131,7 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
             # or dir_geq update in other cases
             with tf.control_dependencies(old_deltas_updates):
                 if SOFT_SIGN:
-                    ds = [2*p-1 for p in probs_greater_zero]
+                    ds = [2*p-1 for p in probs_greater_zero_for_d]
                 else:
                     ds = grads_sign
                 dirs = [-delta*d

@@ -151,7 +151,7 @@ tf.reset_default_graph()
 tf.set_random_seed(args.random_seed) # Set random seed
 losses, regularization_term, variables, phase, accuracy = test_problem.set_up(
     batch_size=args.bs)
-loss = tf.reduce_mean(losses)
+loss = tf.reduce_mean(losses, name="loss")
 if regularization_term is not None:
   loss = loss + regularization_term
 
@@ -163,7 +163,7 @@ learning_rate = tfobs.run_utils.make_learning_rate_tensor(global_step, args)
 opt =  opts.RPROPOptimizer(delta_0=args.delta_0,
              delta_min=args.delta_min, delta_max=args.delta_max,
              eta_minus=args.eta_minus, eta_plus=args.eta_plus)
-step = opt.minimize(losses, var_list=variables, global_step=global_step, USE_MINIBATCH_ESTIMATE=args.USE_MINIBATCH_ESTIMATE, MAKE_NEG_STEP=args.MAKE_NEG_STEP)
+step = opt.minimize(loss, var_list=variables, global_step=global_step, USE_MINIBATCH_ESTIMATE=args.USE_MINIBATCH_ESTIMATE, MAKE_NEG_STEP=args.MAKE_NEG_STEP)
 
 # Lists for tracking stuff
 # train_<quantity>[i] is <quantity> after training for train_steps[i] steps

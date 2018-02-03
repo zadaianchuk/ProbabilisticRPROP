@@ -36,7 +36,7 @@ import time
 import os
 
 import tfobs
-import probabilistic_rprop_optimizer as opts
+import probabilistic_rprop_optimizer_ma as opts
 reload(opts)
 
 # ------- Parse Command Line Arguments ----------------------------------------
@@ -172,7 +172,7 @@ learning_rate = tfobs.run_utils.make_learning_rate_tensor(global_step, args)
 opt =  opts.ProbRPROPOptimizer(delta_0=args.delta_0,
              delta_min=args.delta_min, delta_max=args.delta_max,
              eta_minus=args.eta_minus, eta_plus=args.eta_plus, p_min = args.p_min, eta_type = args.eta_type)
-step = opt.minimize(loss, var_list=variables, global_step=global_step, USE_MINIBATCH_ESTIMATE=args.USE_MINIBATCH_ESTIMATE, SOFT_SIGN=args.SOFT_SIGN)
+step = opt.minimize(loss, var_list=variables, global_step=global_step, SOFT_SIGN=args.SOFT_SIGN)
 
 # Lists for tracking stuff
 # train_<quantity>[i] is <quantity> after training for train_steps[i] steps

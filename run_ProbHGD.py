@@ -36,7 +36,7 @@ import time
 import os
 
 import tfobs
-import probabilistic_rprop_optimizer as opts
+import probabilistic_hyper_gradient_optimizer as opts
 reload(opts)
 
 # ------- Parse Command Line Arguments ----------------------------------------
@@ -67,12 +67,8 @@ parser.add_argument("-UME","--USE_MINIBATCH_ESTIMATE", dest='USE_MINIBATCH_ESTIM
 parser.set_defaults(USE_MINIBATCH_ESTIMATE=True)
 parser.add_argument("-UMA","--USE_MOVING", dest='USE_MINIBATCH_ESTIMATE', action='store_false')
 
-parser.add_argument("-SS","--SOFT_SIGN",  dest='SOFT_SIGN', action='store_true',
-    help="If True we do variance-adapted direction")
-parser.set_defaults(SOFT_SIGN=True)
-parser.add_argument("-NSS","--NO_SOFT_SIGN",  dest='SOFT_SIGN', action='store_false',
-    help="If True we do variance-adapted direction")
-
+parser.add_argument("--d_type",  type=str, default="soft_sign",
+    help="Type of step direction function")
 parser.add_argument("--lr", type=float, default=1,
     help="Constant learning rate (positive float) to use. To set a learning "
     "rate *schedule*, do *not* set '--lr' and use '--lr_sched_steps' "
@@ -134,7 +130,7 @@ args = parser.parse_args()
 
 # Create an identifier for this experiment
 name = args.test_problem.split(".")[-1]
-name += "__ProbRPROP"
+name += "__ProbHGD"
 name += "__bs_" + str(args.bs)
 name += "__delta_0_" + tfobs.run_utils.float2str(args.delta_0)
 name += "__delta_min_" + tfobs.run_utils.float2str(args.delta_min)
@@ -145,7 +141,7 @@ name += "__eta_plus_" + str(args.eta_plus)
 name += "__eta_type_" + args.eta_type
 name += "__N_" + str(args.num_steps)
 name += "__UME_" + str(args.USE_MINIBATCH_ESTIMATE)
-name += "__SOFT_" + str(args.SOFT_SIGN)
+name += "__d_type_" + str(args.d_type)
 name += "__seed_" + str(args.random_seed)
 # Set the data dir
 if args.data_dir is not None:
@@ -160,7 +156,7 @@ tf.reset_default_graph()
 tf.set_random_seed(args.random_seed) # Set random seed
 losses, regularization_term, variables, phase, accuracy = test_problem.set_up(
     batch_size=args.bs)
-loss = tf.reduce_mean(losses, name="loss")
+loss = tf.reduce_mean(losses)
 if regularization_term is not None:
   loss = loss + regularization_term
 
@@ -169,10 +165,10 @@ global_step = tf.Variable(0, trainable=False)
 learning_rate = tfobs.run_utils.make_learning_rate_tensor(global_step, args)
 
 # Set up optimizer
-opt =  opts.ProbRPROPOptimizer(delta_0=args.delta_0,
+opt =  opts.ProbHGDOptimizer(delta_0=args.delta_0,
              delta_min=args.delta_min, delta_max=args.delta_max,
              eta_minus=args.eta_minus, eta_plus=args.eta_plus, p_min = args.p_min, eta_type = args.eta_type)
-step = opt.minimize(loss, var_list=variables, global_step=global_step, USE_MINIBATCH_ESTIMATE=args.USE_MINIBATCH_ESTIMATE, SOFT_SIGN=args.SOFT_SIGN)
+step = opt.minimize(losses, var_list=variables, global_step=global_step, USE_MINIBATCH_ESTIMATE=args.USE_MINIBATCH_ESTIMATE, d_type=args.d_type)
 
 # Lists for tracking stuff
 # train_<quantity>[i] is <quantity> after training for train_steps[i] steps

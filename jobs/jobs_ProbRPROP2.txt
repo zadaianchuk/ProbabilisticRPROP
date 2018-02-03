@@ -1,0 +1,8 @@
+/is/ei/azadaianchuk/RPROP/code/run_momentum.py mnist.mnist_2c2d --bs 128 --mu 0.99 --lr 0.0001 -N 40000 -C 100 -r 43 --logdir tflogs_for_report
+/is/ei/azadaianchuk/RPROP/code/run_RPROP.py mnist.mnist_2c2d --bs 32 --delta_0 0.0001 --delta_min 1e-09 --delta_max 0.001 --eta_minus 0.83 --eta_plus 1.2 -MNS -UMA -N 40000  -r 42 -C 100 --logdir tflogs_for_report
+/is/ei/azadaianchuk/RPROP/code/run_RPROP.py mnist.mnist_2c2d --bs 128 --delta_0 0.0001 --delta_min 1e-09 --delta_max 0.001 --eta_minus 0.83 --eta_plus 1.2 -MNS -UMA -N 40000  -r 42 -C 100 --logdir tflogs_for_report
+/is/ei/azadaianchuk/RPROP/code/run_RPROP.py mnist.mnist_2c2d --bs 512 --delta_0 0.0001 --delta_min 1e-09 --delta_max 0.001 --eta_minus 0.83 --eta_plus 1.2 -MNS -UMA -N 30000  -r 42 -C 100 --logdir tflogs_for_report
+/is/ei/azadaianchuk/RPROP/code/run_RPROP.py mnist.mnist_2c2d --bs 1024 --delta_0 0.0001 --delta_min 1e-09 --delta_max 0.001 --eta_minus 0.83 --eta_plus 1.2 -MNS -UMA -N 20000  -r 42 -C 100 --logdir tflogs_for_report
+/is/ei/azadaianchuk/RPROP/code/run_RPROP.py mnist.mnist_2c2d --bs 2048 --delta_0 0.0001 --delta_min 1e-09 --delta_max 0.001 --eta_minus 0.83 --eta_plus 1.2 -MNS -UMA -N 10000  -r 42 -C 100 --logdir tflogs_for_report
+/is/ei/azadaianchuk/RPROP/code/run_RPROP.py mnist.mnist_2c2d --bs 4096 --delta_0 0.0001 --delta_min 1e-09 --delta_max 0.001 --eta_minus 0.83 --eta_plus 1.2 -MNS -UMA -N 10000  -r 42 -C 100 --logdir tflogs_for_report
+/is/ei/azadaianchuk/RPROP/code/run_RPROP.py mnist.mnist_2c2d --bs 8192 --delta_0 0.0001 --delta_min 1e-09 --delta_max 0.001 --eta_minus 0.83 --eta_plus 1.2 -MNS -UMA -N 10000  -r 42 -C 100 --logdir tflogs_for_report

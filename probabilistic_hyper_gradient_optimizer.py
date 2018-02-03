@@ -5,12 +5,12 @@ import gradient_moment as gm
 
 
 
-class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
+class ProbHGDOptimizer(tf.train.GradientDescentOptimizer):
 
-    def __init__(self, delta_0, learning_rate = 1, name="ProbRPROP", mu=0.99,
+    def __init__(self, delta_0, learning_rate = 1, name="ProbHGD", mu=0.99,
                  delta_min=10**(-9), delta_max=0.05,
-                 eta_minus=0.5, eta_plus=1.2, p_min=0.75, eps=1e-8, eta_type ="exponential"):
-        super(ProbRPROPOptimizer, self).__init__(learning_rate, name=name)
+                 eta_minus=0.5, eta_plus=1.2, p_min=0.75, eps=1e-8, eta_type ="linear"):
+        super(ProbHGDOptimizer, self).__init__(learning_rate, name=name)
 
         self._mu = mu
         self._delta_0 = delta_0
@@ -40,7 +40,7 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         return eta
 
 
-    def minimize(self, loss, global_step, var_list=None, USE_MINIBATCH_ESTIMATE = True,  SOFT_SIGN = False):
+    def minimize(self, losses, global_step, var_list=None, USE_MINIBATCH_ESTIMATE = True, d_type="soft_sign"):
 
         # Algo params as constant tensors
         mu = tf.convert_to_tensor(self._mu, dtype=tf.float32)
@@ -59,11 +59,12 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
         old_deltas = [self._get_or_make_slot(var,
                   tf.constant(self._delta_0, tf.float32, var.get_shape()), "delta", "delta")
                   for var in var_list]
-        old_probs_greater_zero = [self._get_or_make_slot(var,
-                  tf.constant(0.5, tf.float32, var.get_shape()), "prob_g_z", "prob_g_z")
+        ds = [self._get_or_make_slot(var,
+                  tf.constant(0.0, tf.float32, var.get_shape()), "direction", "direction")
                   for var in var_list]
 
         if not USE_MINIBATCH_ESTIMATE:
+            loss = tf.reduce_mean(losses, name = "loss" )
             # moving average estimation
             ms = [self._get_or_make_slot(var,
                 tf.constant(0.0, tf.float32, var.get_shape()), "m", "m")
@@ -99,8 +100,10 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
 
         snrs = [tf.divide(m, tf.sqrt(r) + self._eps) for m, r in zip(grads, rs)]
         probs_greater_zero = [(0.5)*(1.0+tf.erf(tf.sqrt(1/2.0)*snr)) for snr in snrs]
-        probs = [tf.multiply(p,1-old_p)+tf.multiply(old_p,1-p)
-                 for p, old_p in zip(probs_greater_zero, old_probs_greater_zero)]
+
+        probs = [(tf.sign(d)+1.0)/2.0-tf.multiply(tf.sign(d),p) for (p,d) in zip(probs_greater_zero,ds)]
+        # probs = [tf.multiply(p,1-old_p)+tf.multiply(old_p,1-p)
+        #          for p, old_p in zip(probs_greater_zero, old_probs_greater_zero)]
 
         # summary histogram SNR
         abs_snrs =[tf.abs(snr) for snr in snrs]
@@ -133,26 +136,31 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
             # select no update in case of negative product
             # or dir_geq update in other cases
             with tf.control_dependencies(old_deltas_updates):
-                if SOFT_SIGN:
-                    ds = [2*p-1 for p in probs_greater_zero]
-                else:
-                    ds = grads_sign
-                dirs = [-delta*d
-                          for  (delta,d) in zip(deltas,ds)]
-                # else:
-                #     dirs=zeros
-                #     dirs_geq=[-delta*d
-                #               for  (delta,d) in zip(deltas,ds)]
-                #     dirs=[tf.where(tf.logical_or(cond_equal,cond_greater), dir_geq, d)
-                #           for (cond_equal,cond_greater,dir_geq,d)
-                #           in zip(probs_between,prob_near_zero,dirs_geq, dirs)]
+                if d_type == "soft_sign":
+                    ds_updates=[d.assign((2*p-1)) for (p,d) in zip(probs_greater_zero,ds)]
+                    # ds = [2*p-1 for p in probs_greater_zero]
+                if d_type == "sign":
+                    ds_updates=[d.assign(gs) for (gs,d) in zip(grads_sign,ds)]
+                    # ds = grads_sign
+                if d_type == "grad":
+                    ds_updates=[d.assign(g) for (g,d) in zip(grads,ds)]
+                    # ds = grads
+                if d_type == "momentum":
+                    if USE_MINIBATCH_ESTIMATE:
+                        ms = [self._get_or_make_slot(var,
+                            tf.constant(0.0, tf.float32, var.get_shape()), "m", "m")
+                            for var in var_list]
+                        m_updates = [m.assign(mu*m + (1.0-mu)*g) for m, g in zip(ms, grads)]
+                        with tf.control_dependencies(m_updates):
+                            ds_updates=[d.assign(m) for (m,d) in zip(ms,ds)]
 
-                with tf.control_dependencies(dirs):
-                    old_probs_greater_zero_updates = [old_prob.assign(prob)
-                                         for (old_prob, prob) in zip(old_probs_greater_zero, probs_greater_zero)]
-
-                    # here learning rate is scaling parameter, by default equal 1
-                    with tf.control_dependencies(old_probs_greater_zero_updates):
+                    else:
+                        with tf.control_dependencies(m_updates):
+                            ds_updates=[d.assign(m) for (m,d) in zip(ms,ds)]
+                with tf.control_dependencies(ds_updates):
+                    dirs = [-delta*d for  (delta,d) in zip(deltas,ds)]
+                    with tf.control_dependencies(dirs):
+                        # here learning rate is scaling parameter, by default equal 1
                         variable_updates = [v.assign_add(d) for v, d in zip(var_list, dirs)]
                         global_step.assign_add(1)
                         with tf.name_scope("summaries"):
@@ -161,6 +169,8 @@ class ProbRPROPOptimizer(tf.train.GradientDescentOptimizer):
                                 max_sum = tf.summary.scalar("max", delta_max_count, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
                                 for (i,prob) in enumerate(probs):
                                     prob_sum = tf.summary.histogram("switch_hist/"+str(i), prob, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
+                                for (i,d) in enumerate(ds):
+                                    d_sum = tf.summary.histogram("dir_hist/"+str(i), d, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
                                 for (i,prob) in enumerate(probs_greater_zero):
                                     prob_sum = tf.summary.histogram("prob_zero_hist/"+str(i), prob, collections=[tf.GraphKeys.SUMMARIES, "per_iteration"])
                                 for (i,snr) in enumerate(abs_snrs):
